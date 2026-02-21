@@ -274,21 +274,20 @@ in float vSize;
 out vec4 fragColor;
 
 void main() {
-    // Discard zero-size (inactive) points entirely
     if (vSize <= 0.0) discard;
 
-    // Discard outside circle radius 0.5
     float d = length(vUV);
     if (d > 0.5) discard;
 
-    // Soft edge for anti-aliasing
-    float alpha = 1.0 - smoothstep(0.30, 0.5, d);
+    // Soft anti-aliased edge
+    float alpha = 1.0 - smoothstep(0.25, 0.5, d);
 
-    // Soft glow core — keep it subtle
-    float glow = exp(-d * d * 10.0) * 0.4;
+    // Stronger, more visible Gaussian glow tuned for 1M–2M points
+    float glow = exp(-d * d * 5.0) * 0.55;   // ← tuned here
+
     vec3 col = vColor + vColor * glow;
 
-    fragColor = vec4(col, alpha);
+    fragColor = vec4(col, alpha * 0.85);
 }
 )";
 
