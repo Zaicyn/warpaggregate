@@ -29,7 +29,7 @@
 //   ./blackhole                  — hex lattice, 80 rings (~19k points)
 //   ./blackhole --rings 150      — hex lattice, 150 rings (~68k points)
 //   ./blackhole --random         — 20k random points, physics-driven evolution
-//   ./blackhole --random 50000   — 50k random points
+//   ./blackhole --random 5000000 — 5M random points (recompile with -DMAX_DISK_PTS=5000000)
 //
 // Controls:
 //   Left drag  — orbit camera
@@ -68,10 +68,15 @@
 #define TWO_PI        6.28318530717959f
 
 // Disk lattice — hex rings.  DISK_RINGS=80 → ~20k points (fast), 200 → ~125k (heavy).
-// Start at 80 for a quick first run; crank up once you know it compiles.
 #define DISK_RINGS    80
-// Approximate point count: 1 + 6*sum(1..R) = 1 + 3*R*(R+1)
-#define MAX_DISK_PTS  (1 + 3*DISK_RINGS*(DISK_RINGS+1))
+
+// MAX_DISK_PTS is set at compile time via -DMAX_DISK_PTS=N, or defaults to 1M.
+// There is no enforced cap — pass whatever you want and let the GPU decide.
+// GPUDisk is cudaMalloc'd so the real limit is your VRAM.
+//   nvcc ... -DMAX_DISK_PTS=5000000   # 5M points, ~390MB GPUDisk
+#ifndef MAX_DISK_PTS
+#define MAX_DISK_PTS  1000000
+#endif
 
 // Black hole / disk geometry (Schwarzschild units: M=1)
 #define BH_MASS       1.0f
@@ -863,7 +868,7 @@ int main(int argc, char** argv) {
         std::normal_distribution<float> rnorm(0.0f, 1.0f);
 
         int placed = 0;
-        while (placed < random_n && placed < MAX_DISK_PTS) {
+        while (placed < random_n) {
             float r2  = r2_min + runif(rng) * (r2_max - r2_min);
             float rad = sqrtf(r2);
             float orb_phi = rphase(rng);
@@ -890,7 +895,7 @@ int main(int argc, char** argv) {
 
                 int layers = (rad < ISCO_R * 1.5f) ? 1 : 3;
                 for (int lyr = 0; lyr < layers; lyr++) {
-                    if ((int)h_hq.size() >= MAX_DISK_PTS) goto done_lattice;
+                    if ((int)h_hq.size() >= MAX_DISK_PTS) goto done_lattice; // only fires if compile-time MAX exceeded
                     float frac  = (layers == 1) ? 0.0f : (lyr / (float)(layers-1) - 0.5f);
                     float taper = fminf(1.0f, (rad - ISCO_R) / (ISCO_R * 0.5f));
                     float zoff  = frac * DISK_THICKNESS * taper;
